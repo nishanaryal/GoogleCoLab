@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EXIF GPS Metadata Viewer with Interactive Map</title>
+    
+    <!-- Leaflet CSS for maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .upload-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 2;
+        }
+        
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+        }
+        
+        .file-input-label i {
+            font-size: 1.3em;
+        }
+        
+        .preview-section {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 30px;
+            gap: 30px;
+        }
+        
+        .image-preview-container {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .image-preview {
+            width: 100%;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            background: #f8f9fa;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .placeholder-image {
+            color: #adb5bd;
+            font-size: 1.2em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .placeholder-image i {
+            font-size: 4em;
+        }
+        
+        .metadata-section {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .metadata-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .metadata-grid {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .metadata-item {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .metadata-item:last-child {
+            border-bottom: none;
+        }
+        
+        .metadata-label {
+            flex: 0 0 120px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .metadata-value {
+            flex: 1;
+            color: #212529;
+            word-break: break-word;
+        }
+        
+        .metadata-value.gps {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .gps-coordinates {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .gps-coordinates h3 {
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+        
+        .gps-coordinates p {
+            font-size: 1.2em;
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+        
+        .map-section {
+            padding: 0 30px 30px 30px;
+        }
+        
+        .map-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            z-index: 1;
+        }
+        
+        .no-gps-message {
+            text-align: center;
+            padding: 50px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            color: #6c757d;
+        }
+        
+        .no-gps-message i {
+            font-size: 4em;
+            margin-bottom: 20px;
+            color: #adb5bd;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading i {
+            font-size: 2em;
+            color: #667eea;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .preview-section {
+                flex-direction: column;
+            }
+            
+            header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-camera-retro"></i> EXIF GPS Metadata Viewer</h1>
+            <p>Upload an image to extract EXIF data and view GPS coordinates on an interactive map</p>
+        </header>
+        
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="imageInput" accept="image/*" capture="environment">
+                <div class="file-input-label">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span>Choose an image</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <i class="fas fa-spinner"></i> Processing image...
+        </div>
+        
+        <div class="preview-section">
+            <div class="image-preview-container">
+                <div class="image-preview">
+                    <div id="imagePreview" class="placeholder-image">
+                        <i class="fas fa-image"></i>
+                        <p>No image selected</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="metadata-section">
+                <h2><i class="fas fa-info-circle"></i> EXIF Metadata</h2>
+                <div id="metadata" class="metadata-grid">
+                    <div class="metadata-item">
+                        <span class="metadata-label">Status:</span>
+                        <span class="metadata-value">Upload an image to view metadata</span>
+                    </div>
+                </div>
+                <div id="gpsDisplay" style="display: none;" class="gps-coordinates">
+                    <h3><i class="fas fa-map-marker-alt"></i> GPS Coordinates</h3>
+                    <p id="gpsCoordinates"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="map-section">
+            <h2><i class="fas fa-map-marked-alt"></i> Location Map</h2>
+            <div id="map"></div>
+            <div id="noGpsMessage" class="no-gps-message" style="display: none;">
+                <i class="fas fa-map-pin"></i>
+                <h3>No GPS Data Found</h3>
+                <p>This image doesn't contain GPS coordinates. Try uploading a different image.</p>
+            </div>
+        </div>
+        
+        <footer>
+            <p>© 2026 EXIF GPS Metadata Viewer | Upload images to extract and visualize location data</p>
+        </footer>
+    </div>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- EXIF.js library for reading metadata -->
+    <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+    
+    <script>
+        let map;
+        let marker;
+        let currentLatLng = null;
+        
+        // Initialize map with a default view
+        function initMap() {
+            map = L.map('map').setView([20, 0], 2);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+        
+        // Convert EXIF GPS coordinates to decimal degrees
+        function convertDMSToDD(degrees, minutes, seconds, ref) {
+            let dd = degrees + (minutes / 60) + (seconds / 3600);
+            if (ref === 'S' || ref === 'W') {
+                dd = dd * -1;
+            }
+            return dd;
+        }
+        
+        // Parse EXIF data and display metadata
+        function displayEXIFData(imageFile) {
+            const loading = document.getElementById('loading');
+            const metadataDiv = document.getElementById('metadata');
+            const gpsDisplay = document.getElementById('gpsDisplay');
+            const gpsCoordinates = document.getElementById('gpsCoordinates');
+            const noGpsMessage = document.getElementById('noGpsMessage');
+            
+            loading.style.display = 'block';
+            metadataDiv.innerHTML = '';
+            gpsDisplay.style.display = 'none';
+            noGpsMessage.style.display = 'none';
+            
+            if (marker) {
+                map.removeLayer(marker);
+                marker = null;
+            }
+            
+            EXIF.getData(imageFile, function() {
+                loading.style.display = 'none';
+                const allMetaData = EXIF.getAllTags(this);
+                console.log('EXIF Data:', allMetaData);
+                
+                if (Object.keys(allMetaData).length === 0) {
+                    metadataDiv.innerHTML = `
+                        <div class="metadata-item">
+                            <span class="metadata-label">Status:</span>
+                            <span class="metadata-value">No EXIF data found in this image</span>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Filter and display relevant metadata
+                const relevantTags = [
+                    'Make', 'Model', 'DateTime', 'ExposureTime', 'FNumber',
+                    'ISO', 'FocalLength', 'GPSLatitude', 'GPSLongitude',
+                    'GPSLatitudeRef', 'GPSLongitudeRef', 'GPSAltitude',
+                    'Orientation', 'Software', 'Artist', 'Copyright'
+                ];
+                
+                let metadataHTML = '';
+                let hasGPS = false;
+                let lat = null, lng = null;
+                
+                for (const tag of relevantTags) {
+                    if (allMetaData[tag] !== undefined) {
+                        let value = allMetaData[tag];
+                        
+                        // Handle GPS coordinates
+                        if (tag === 'GPSLatitude' || tag === 'GPSLongitude') {
+                            if (Array.isArray(value)) {
+                                value = value.map(v => v.numerator / v.denominator).join('° ');
+                                if (tag === 'GPSLatitude') {
+                                    const ref = allMetaData.GPSLatitudeRef || 'N';
+                                    lat = convertDMSToDD(
+                                        allMetaData.GPSLatitude[0].numerator / allMetaData.GPSLatitude[0].denominator,
+                                        allMetaData.GPSLatitude[1].numerator / allMetaData.GPSLatitude[1].denominator,
+                                        allMetaData.GPSLatitude[2].numerator / allMetaData.GPSLatitude[2].denominator,
+                                        ref
+                                    );
+                                } else if (tag === 'GPSLongitude') {
+                                    const ref = allMetaData.GPSLongitudeRef || 'E';
+                                    lng = convertDMSToDD(
+                                        allMetaData.GPSLongitude[0].numerator / allMetaData.GPSLongitude[0].denominator,
+                                        allMetaData.GPSLongitude[1].numerator / allMetaData.GPSLongitude[1].denominator,
+                                        allMetaData.GPSLongitude[2].numerator / allMetaData.GPSLongitude[2].denominator,
+                                        ref
+                                    );
+                                }
+                            }
+                        }
+                        
+                        // Format exposure time nicely
+                        if (tag === 'ExposureTime' && typeof value === 'object') {
+                            value = `${value.numerator}/${value.denominator} sec`;
+                        }
+                        
+                        // Format FNumber
+                        if (tag === 'FNumber' && typeof value === 'object') {
+                            value = `f/${value.numerator / value.denominator}`;
+                        }
+                        
+                        // Format FocalLength
+                        if (tag === 'FocalLength' && typeof value === 'object') {
+                            value = `${value.numerator / value.denominator} mm`;
+                        }
+                        
+                        metadataHTML += `
+                            <div class="metadata-item">
+                                <span class="metadata-label">${tag}:</span>
+                                <span class="metadata-value">${value}</span>
+                            </div>
+                        `;
+                    }
+                }
+                
+                // Check for GPS Altitude
+                if (allMetaData.GPSAltitude) {
+                    const altitude = allMetaData.GPSAltitude.numerator / allMetaData.GPSAltitude.denominator;
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <span class="metadata-label">GPSAltitude:</span>
+                            <span class="metadata-value">${altitude} meters</span>
+                        </div>
+                    `;
+                }
+                
+                // If we have both coordinates, display GPS section and update map
+                if (lat !== null && lng !== null) {
+                    hasGPS = true;
+                    currentLatLng = [lat, lng];
+                    
+                    gpsCoordinates.innerHTML = `
+                        <strong>Latitude:</strong> ${lat.toFixed(6)}°<br>
+                        <strong>Longitude:</strong> ${lng.toFixed(6)}°
+                    `;
+                    gpsDisplay.style.display = 'block';
+                    
+                    // Update map
+                    map.setView(currentLatLng, 15);
+                    marker = L.marker(currentLatLng).addTo(map)
+                        .bindPopup(`
+                            <b>Image Location</b><br>
+                            Lat: ${lat.toFixed(6)}°<br>
+                            Lng: ${lng.toFixed(6)}°
+                        `).openPopup();
+                    
+                    noGpsMessage.style.display = 'none';
+                } else {
+                    noGpsMessage.style.display = 'block';
+                }
+                
+                metadataDiv.innerHTML = metadataHTML || '<div class="metadata-item"><span class="metadata-label">Status:</span><span class="metadata-value">No relevant EXIF data found</span></div>';
+            });
+        }
+        
+        // Handle image upload and preview
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Show image preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewDiv = document.getElementById('imagePreview');
+                previewDiv.innerHTML = `<img src="${e.target.result}" alt="Uploaded preview">`;
+            };
+            reader.readAsDataURL(file);
+            
+            // Display EXIF data
+            displayEXIFData(file);
+        });
+        
+        // Initialize map when page loads
+        window.onload = function() {
+            initMap();
+        };
+        
+        // Handle drag and drop
+        document.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('drop', function(e) {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                document.getElementById('imageInput').files = e.dataTransfer.files;
+                
+                // Trigger change event manually
+                const event = new Event('change', { bubbles: true });
+                document.getElementById('imageInput').dispatchEvent(event);
+            }
+        });
+    </script>
+</body>
+</html>
